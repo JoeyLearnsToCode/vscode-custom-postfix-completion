@@ -1,7 +1,7 @@
 {
-  "name": "custom-postfix-template",
-  "displayName": "Custom Postfix Template",
-  "description": "Enable postfix completion for any language",
+  "name": "custom-postfix-completion",
+  "displayName": "Custom Postfix Completion",
+  "description": "A plugin to enable postfix completion for any language",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"
@@ -9,27 +9,93 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "custom-postfix-template.refresh-configs",
-        "title": "Custom Postfix Template: refresh configs"
+        "command": "custom-postfix-completion.refresh-configs",
+        "title": "Custom Postfix Completion: refresh configs"
       },
       {
-        "command": "custom-postfix-template.expand",
-        "title": "Custom Postfix Template: expand template"
+        "command": "custom-postfix-completion.apply-template",
+        "title": "Custom Postfix Completion: apply template"
       }
     ],
     "configuration": {
-      "title": "Custom Postfix Template",
+      "type": "object",
+      "title": "Custom Postfix Completion",
       "properties": {
-        "custom-postfix-template.templates": {
-          "type": "array",
-          "default": [],
-          "markdownDescription": "postfix templates for each language",
-          "$schema": "./configuration-schema.json"
+        "custom-postfix-completion": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "description": "Please edit the configuration file",
+          "default": {
+            "languageTemplates": {}
+          },
+          "properties": {
+            "languageTemplates": {
+              "type": "object",
+              "description": "Language specific templates",
+              "patternProperties": {
+                "^\\w+$": {
+                  "description": "LanguageId from https://code.visualstudio.com/docs/languages/identifiers",
+                  "type": "object",
+                  "default": {
+                    "templates": [
+                      {
+                        "triggerWord": "print",
+                        "description": "Just print",
+                        "contents": [
+                          "print($expr$)$END$"
+                        ]
+                      }
+                    ]
+                  },
+                  "properties": {
+                    "templates": {
+                      "type": "array",
+                      "description": "Templates for this language",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "triggerWord": {
+                            "type": "string",
+                            "description": "The word that triggers the template"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "A description of what the template does"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The content of the template"
+                          },
+                          "exprRegExp": {
+                            "type": "string",
+                            "default": "\\w+",
+                            "description": "Regular expression to match expressions for the template, default: \\w+"
+                          }
+                        },
+                        "required": [
+                          "triggerWord",
+                          "description",
+                          "contents"
+                        ]
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "additionalProperties": false
         }
       }
     }

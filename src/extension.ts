@@ -2,16 +2,16 @@ import * as vscode from 'vscode';
 
 export function activate(context: vscode.ExtensionContext) {
 	// 注册命令
-	let disposable = vscode.commands.registerCommand('custom-postfix-template.refresh-configs', tryCommand(refreshConfigs));
+	let disposable = vscode.commands.registerCommand('custom-postfix-completion.refresh-configs', tryCommand(refreshConfigs));
 	context.subscriptions.push(disposable);
-	disposable = vscode.commands.registerCommand('custom-postfix-template.expand', tryCommand(expandTemplate));
+	disposable = vscode.commands.registerCommand('custom-postfix-completion.apply-template', tryCommand(applyTemplate));
 	context.subscriptions.push(disposable);
 
 	// 初始计划配置
 	refreshConfigs();
 	// 配置变化时重新加载配置
 	vscode.workspace.onDidChangeConfiguration((e) => {
-		if (e.affectsConfiguration('custom-postfix-template')) {
+		if (e.affectsConfiguration('custom-postfix-completion')) {
 			refreshConfigs();
 		}
 	});
@@ -38,23 +38,26 @@ interface LanguagePostfixTemplate {
 }
 
 function refreshConfigs() {
-	configuration = vscode.workspace.getConfiguration('custom-postfix-template');
+	configuration = vscode.workspace.getConfiguration('custom-postfix-completion');
 	if (!configuration) {
 		return;
 	}
-	let templatesConfigRaw = configuration.get('templates')
-	if (!templatesConfigRaw) {
+	let languageTemplatesRaw = configuration.get('languageTemplates')
+	if (!languageTemplatesRaw) {
 		return;
 	}
-	let templatesConfig = templatesConfigRaw as { [key: string]: any }
-	const languageIds = Object.keys(templatesConfigRaw);
+	let languageTemplates = languageTemplatesRaw as { [key: string]: any }
+	const languageIds = Object.keys(languageTemplatesRaw);
 
 	let newMap = new Map();
 	languageIds.forEach((languageId) => {
-		let eachLangTemplate = templatesConfig[languageId] as { templates: LanguagePostfixTemplate[]; };
-		const templateList = eachLangTemplate.templates;
-		templateList.forEach((template) => {
+		let eachLangTemplate = languageTemplates[languageId] as { templates: LanguagePostfixTemplate[] | undefined; };
+		if(!eachLangTemplate.templates){
+			return
+		}
+		eachLangTemplate.templates.forEach((template) => {
 			if (template.exprRegExp) {
+				console.log("exprRegExp", template.exprRegExp);
 				template.exprRegExp = new RegExp(template.exprRegExp);
 			} else {
 				template.exprRegExp = DEFAULT_WORD_REGEX
@@ -70,7 +73,7 @@ function getKey(language: string, triggerWord: string): string {
 	return language + ':' + triggerWord;
 }
 
-function expandTemplate() {
+function applyTemplate() {
 	const editor = vscode.window.activeTextEditor;
 	if (!editor) {
 		return;

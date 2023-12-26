@@ -1,43 +1,52 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Generated schema for Root",
-    "type": "array",
-    "items": {
-        "type": "object",
-        "properties": {
-            "language": {
-                "type": "string",
-                "description": "language name"
-            },
-            "templates": {
-                "type": "array",
-                "items": {
+    "type": "object",
+    "properties": {
+        "languageTemplates": {
+            "type": "object",
+            "description": "Language specific templates",
+            "patternProperties": {
+                "^\\w+$": {
                     "type": "object",
                     "properties": {
-                        "triggerWord": {
-                            "type": "string"
-                        },
-                        "description": {
-                            "type": "string"
-                        },
-                        "contents": {
+                        "templates": {
                             "type": "array",
                             "items": {
-                                "type": "string"
+                                "type": "object",
+                                "properties": {
+                                    "triggerWord": {
+                                        "type": "string",
+                                        "description": "The word that triggers the template"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "A description of what the template does"
+                                    },
+                                    "contents": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The content of the template"
+                                    },
+                                    "exprRegExp": {
+                                        "type": "string",
+                                        "default": "\\w+",
+                                        "description": "Regular expression to match expressions for the var template"
+                                    }
+                                },
+                                "required": [
+                                    "triggerWord",
+                                    "description",
+                                    "contents"
+                                ]
                             }
                         }
                     },
-                    "required": [
-                        "triggerWord",
-                        "description",
-                        "contents"
-                    ]
+                    "additionalProperties": false
                 }
             }
-        },
-        "required": [
-            "language",
-            "templates"
-        ]
-    }
+        }
+    },
+    "additionalProperties": false
 }
