@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 const EXTENSION_NAME = "Custom Postfix Completion"
 const DEFAULT_WORD_REGEX = /\w+/
 const POSSIBLE_VARIABLE_REGEX = /\$\{[^\}]*\}/g;
-const VARIABLE_REGEX = /\$\{(\w+)(?:#(\d+))?(?::(\w+\(expr\))?(?::([^\}]+))?)?\}/g;
+const VARIABLE_REGEX = /\$\{(\w+)(?:#(\d+))?(?::(\w+\(target\))?(?::([^\}]+))?)?\}/g;
 let extensionContext: vscode.ExtensionContext;
 let isDebugMode = false;
 let configuration: vscode.WorkspaceConfiguration;
@@ -11,7 +11,7 @@ let languagePostfixTemplatesMap: Map<string, LanguagePostfixTemplate>;
 type LanguagePostfixTemplate = {
 	triggerWord: string;
 	description: string;
-	exprRegExp: RegExp;
+	targetRegExp: RegExp;
 	body: string[];
 
 	parsedBody: (string | TemplateVarible)[];
@@ -112,10 +112,10 @@ function parseLanguagePostfixTemplates() {
 				continue;
 			}
 
-			if (template.exprRegExp) {
-				template.exprRegExp = new RegExp(template.exprRegExp);
+			if (template.targetRegExp) {
+				template.targetRegExp = new RegExp(template.targetRegExp);
 			} else {
-				template.exprRegExp = DEFAULT_WORD_REGEX;
+				template.targetRegExp = DEFAULT_WORD_REGEX;
 			}
 			newMap.set(key, template);
 		}
@@ -153,9 +153,9 @@ function validateAndParseTemplate(template: LanguagePostfixTemplate): string | u
 
 		// 不定义 NO 的变量跳过用户交互
 		const skipUserInteraction = no === undefined;
-		const isExpr = /^expr$/i.test(name);
-		// 跳过用户交互的变量必须是 expr 变量，或者包含 EXPRESSION 或 DEFAULT_VALUE
-		if (skipUserInteraction && !isExpr && !expression && !defaultValue) {
+		const isTarget = /^target$/i.test(name);
+		// 跳过用户交互的变量必须是 target 变量，或者包含 EXPRESSION 或 DEFAULT_VALUE
+		if (skipUserInteraction && !isTarget && !expression && !defaultValue) {
 			return `NAME without #NO must include EXPRESSION or DEFAULT_VALUE: ${variable}`;
 		}
 		let expressionAndParam: (((word: string) => string) | string)[] | undefined;
@@ -216,28 +216,28 @@ function applyTemplate() {
 	}
 
 	// 获取模板应用于的表达式（也就是.前面的那部分）
-	const exprRange = editor.document.getWordRangeAtPosition(dotPosition/* .translate(0, -1) */, template.exprRegExp);
-	debugLog("exprRange", exprRange);
-	if (!exprRange) {
+	const targetRange = editor.document.getWordRangeAtPosition(dotPosition/* .translate(0, -1) */, template.targetRegExp);
+	debugLog("targetRange", targetRange);
+	if (!targetRange) {
 		return;
 	}
-	let exprWord = editor.document.getText(exprRange);
-	debugLog("triggerWord", triggerWord, "exprWord", exprWord);
-	if (!triggerWord || !exprWord) {
+	let targetWord = editor.document.getText(targetRange);
+	debugLog("triggerWord", triggerWord, "targetWord", targetWord);
+	if (!triggerWord || !targetWord) {
 		return;
 	}
-	if (exprWord.endsWith('.' + triggerWord)) {
-		exprWord = exprWord.substring(0, exprWord.length - triggerWord.length - 1)
+	if (targetWord.endsWith('.' + triggerWord)) {
+		targetWord = targetWord.substring(0, targetWord.length - triggerWord.length - 1)
 	}
-	debugLog("triggerWord", triggerWord, "exprWord", exprWord);
+	debugLog("triggerWord", triggerWord, "targetWord", targetWord);
 
-	const snippet = templateToSnippet(template, exprWord);
+	const snippet = templateToSnippet(template, targetWord);
 	if (snippet) {
-		let replaceRange = new vscode.Range(exprRange.start, triggerWordRange.end);
+		let replaceRange = new vscode.Range(targetRange.start, triggerWordRange.end);
 		editor.insertSnippet(snippet, replaceRange);
 	}
 }
-function templateToSnippet(template: LanguagePostfixTemplate, exprWord: string): vscode.SnippetString | undefined {
+function templateToSnippet(template: LanguagePostfixTemplate, targetWord: string): vscode.SnippetString | undefined {
 	const snippet = new vscode.SnippetString();
 	for (const part of template.parsedBody) {
 		if (typeof part === 'string') {
@@ -247,8 +247,8 @@ function templateToSnippet(template: LanguagePostfixTemplate, exprWord: string):
 
 		let variable = part as TemplateVarible;
 		const skipUserInteraction = variable.no === undefined;
-		const isExpr = /^expr$/i.test(variable.name);
-		const value = isExpr ? exprWord : evalExpression(variable.expressionAndParam, exprWord) || variable.defaultValue || '';
+		const isTarget = /^target$/i.test(variable.name);
+		const value = isTarget ? targetWord : evalExpression(variable.expressionAndParam, targetWord) || variable.defaultValue || '';
 		if (skipUserInteraction) {
 			snippet.appendText(value);
 		} else {
@@ -263,7 +263,7 @@ function extractExpression(expression: string): string[] | undefined {
 	let match = /^(\w+)\((.*)\)$/.exec(expression);
 	return match ? [match[1], match[2]] : undefined;
 }
-function getExpressionFunc(expressionName: string): undefined | ((expr: string) => string) {
+function getExpressionFunc(expressionName: string): undefined | ((target: string) => string) {
 	switch (expressionName) {
 		case "escapeString": {
 			return expressionEscapeString;
@@ -273,12 +273,12 @@ function getExpressionFunc(expressionName: string): undefined | ((expr: string) 
 		}
 	}
 }
-function evalExpression(expressionAndParam: (((word: string) => string) | string)[] | undefined, exprWord: string): string | undefined {
+function evalExpression(expressionAndParam: (((word: string) => string) | string)[] | undefined, targetWord: string): string | undefined {
 	if (!expressionAndParam) {
 		return undefined;
 	}
-	return (expressionAndParam[0] as ((expr: string) => string))(exprWord);
+	return (expressionAndParam[0] as ((target: string) => string))(targetWord);
 }
-function expressionEscapeString(exprWord: string): string {
-	return exprWord.replaceAll('"', '\\"');
+function expressionEscapeString(targetWord: string): string {
+	return targetWord.replaceAll('"', '\\"');
 }

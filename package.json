@@ -49,7 +49,7 @@
                         "triggerWord": "print",
                         "description": "Just print",
                         "body": [
-                          "print($expr$)$END$"
+                          "print($target$)$END$"
                         ]
                       }
                     ]
@@ -76,7 +76,7 @@
                             },
                             "description": "The body of the template, each element will be a new line"
                           },
-                          "exprRegExp": {
+                          "targetRegExp": {
                             "type": "string",
                             "default": "\\w+",
                             "description": "Regular expression to match expressions for the template, default: \\w+"
