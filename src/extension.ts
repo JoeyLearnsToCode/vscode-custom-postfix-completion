@@ -2,8 +2,7 @@ import * as vscode from 'vscode';
 
 const EXTENSION_NAME = "Custom Postfix Completion"
 const DEFAULT_WORD_REGEX = /\w+/
-const POSSIBLE_VARIABLE_REGEX = /\$\{[^\}]*\}/g;
-const VARIABLE_REGEX = /\$\{(\w+)(?:#(\d+))?(?::(\w+\(target\))?(?::([^\}]+))?)?\}/g;
+const VARIABLE_REGEX = /^\$\{(\w+)(?:#(\d+))?(?::(\w+\(target\))?(?::(.+))?)?\}$/;
 let extensionContext: vscode.ExtensionContext;
 let isDebugMode = false;
 let configuration: vscode.WorkspaceConfiguration;
@@ -130,24 +129,21 @@ function parseLanguagePostfixTemplates() {
  * @return {string | undefined} - Validation errors or undefined if the template is valid.
  */
 function validateAndParseTemplate(template: LanguagePostfixTemplate): string | undefined {
-	let lastIndex = 0;
-	let parsedBody: (string | TemplateVarible)[] = [];
-	let matches: RegExpExecArray | null;
-
+	const parsedBody: (string | TemplateVarible)[] = [];
 	const body = template.body.join('\n');
-	while ((matches = POSSIBLE_VARIABLE_REGEX.exec(body)) !== null) {
-		if (matches.index > lastIndex) {
-			parsedBody.push(body.substring(lastIndex, matches.index));
+	const bodyParts = splitBody(body);
+	for(const part of bodyParts) {
+		if(!(part.startsWith('${') && part.endsWith('}'))) {
+			parsedBody.push(part);
+			continue;
 		}
-		lastIndex = matches.index + matches[0].length;
 
-		const possibleVariable = matches[0];
-		matches = VARIABLE_REGEX.exec(possibleVariable);
+		const possibleVariable = part;
+		const matches = VARIABLE_REGEX.exec(possibleVariable);
 		VARIABLE_REGEX.lastIndex = 0;
 		if (!matches) {
 			return `Wrong format of variable: ${possibleVariable}`;
 		}
-
 		const [variable, name, no, expression, defaultValue] = matches;
 		debugLog("variable", variable, "name", name, "no", no, "expression", expression, "defaultValue", defaultValue);
 
@@ -178,12 +174,40 @@ function validateAndParseTemplate(template: LanguagePostfixTemplate): string | u
 			defaultValue,
 		} as TemplateVarible);
 	}
-	POSSIBLE_VARIABLE_REGEX.lastIndex = 0;
-	if (lastIndex < body.length) {
-		parsedBody.push(body.substring(lastIndex));
-	}
 	template.parsedBody = parsedBody;
 	return undefined;
+}
+// 把 body 拆分为变量和非变量，按顺序添加到 results。
+// 不用正则的原因是正则不太好处理 `${`、`}` 嵌套的情况。
+function splitBody(body: string): string[] {
+	const results: string[] = [];
+	const stack: number[] = [];
+	let lastMatchEndIndex = 0;
+	for (let i = 0; i < body.length; i++) {
+		if (body[i] === '$' && i + 1 < body.length && body[i + 1] === '{') {
+			stack.push(i);
+			i++;
+		} else if (body[i] === '{') {
+			if (stack.length > 0) {
+				stack.push(i);
+			}
+		} else if (body[i] === '}') {
+			if (stack.length > 0) {
+				const lastOpeningIndex = stack.pop() as number;
+				if (stack.length === 0) {
+					if (lastMatchEndIndex < lastOpeningIndex) {
+						results.push(body.substring(lastMatchEndIndex, lastOpeningIndex));
+					}
+					results.push(body.substring(lastOpeningIndex, i + 1));
+					lastMatchEndIndex = i + 1;
+				}
+			}
+		}
+	}
+	if (lastMatchEndIndex < body.length) {
+		results.push(body.substring(lastMatchEndIndex));
+	}
+	return results;
 }
 
 function applyTemplate() {

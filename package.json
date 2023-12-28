@@ -31,7 +31,7 @@
         "custom-postfix-completion": {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
-          "description": "Please edit the configuration file",
+          "description": "Please edit in the settings.json file",
           "default": {
             "languageTemplates": {}
           },
