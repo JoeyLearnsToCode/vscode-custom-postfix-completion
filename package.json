@@ -74,7 +74,7 @@
                             "items": {
                               "type": "string"
                             },
-                            "description": "The content of the template"
+                            "description": "The body of the template, each element will be a new line"
                           },
                           "exprRegExp": {
                             "type": "string",
@@ -93,6 +93,11 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "debugMode":{
+              "type": "boolean",
+              "default": false,
+              "description": "Enable debug mode for more console logs"
             }
           },
           "additionalProperties": false
