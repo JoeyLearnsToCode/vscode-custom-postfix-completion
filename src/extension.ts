@@ -1,12 +1,13 @@
 import * as vscode from 'vscode';
 
 const EXTENSION_NAME = "Custom Postfix Completion"
+const COMMAND_APPLY_TEMPLATE = 'custom-postfix-completion.apply-template';
 const DEFAULT_WORD_REGEX = /\w+/
 const VARIABLE_REGEX = /^\$\{(\w+)(?:#(\d+))?(?::(\w+\(target\))?(?::(.+))?)?\}$/;
 let extensionContext: vscode.ExtensionContext;
 let isDebugMode = false;
 let configuration: vscode.WorkspaceConfiguration;
-let languagePostfixTemplatesMap: Map<string, LanguagePostfixTemplate>;
+let languagePostfixTemplatesMap: Map<string, Map<string, LanguagePostfixTemplate>>;
 type LanguagePostfixTemplate = {
 	triggerWord: string;
 	description: string;
@@ -30,28 +31,27 @@ export function activate(context: vscode.ExtensionContext) {
 	try {
 		refreshConfigs();
 	} catch (error) {
-		debugLog(error);
+		console.log(error);
 		showErrorMessage('Fail to initialize, you can check console (in developer tools) to see more details');
 	}
 
 	// 注册命令
-	let disposable = vscode.commands.registerCommand('custom-postfix-completion.refresh-configs', tryCommand(refreshConfigs));
-	context.subscriptions.push(disposable);
-	disposable = vscode.commands.registerCommand('custom-postfix-completion.apply-template', tryCommand(applyTemplate));
+	let disposable = vscode.commands.registerCommand(COMMAND_APPLY_TEMPLATE, tryCommand(applyTemplate));
 	context.subscriptions.push(disposable);
 
 	// 配置变化时重新加载配置
-	vscode.workspace.onDidChangeConfiguration((e) => {
+	disposable = vscode.workspace.onDidChangeConfiguration((e: vscode.ConfigurationChangeEvent) => {
 		if (e.affectsConfiguration('custom-postfix-completion')) {
 			refreshConfigs();
 		}
 	});
+	context.subscriptions.push(disposable);
 }
 
 function tryCommand(callback: (...args: any[]) => any): (...args: any[]) => any {
-	return function () {
+	return function (...args: any[]) {
 		try {
-			callback();
+			callback(...args);
 		} catch (error) {
 			console.log(error);
 			showErrorMessage('Fail to execute command, you can check console (in developer tools) to see more details');
@@ -67,9 +67,6 @@ function showErrorMessage<T extends string>(message: string, ...items: T[]): The
 	return vscode.window.showErrorMessage(`${EXTENSION_NAME}: ` + message, ...items);
 }
 
-function getKey(language: string, triggerWord: string): string {
-	return language + ':' + triggerWord;
-}
 function refreshConfigs() {
 	configuration = vscode.workspace.getConfiguration('custom-postfix-completion');
 	if (!configuration) {
@@ -83,6 +80,7 @@ function refreshConfigs() {
 	}
 
 	parseLanguagePostfixTemplates();
+	registerPostfixCompletionProvider();
 }
 function parseLanguagePostfixTemplates() {
 	let languageTemplatesRaw = configuration.get('languageTemplates')
@@ -91,16 +89,16 @@ function parseLanguagePostfixTemplates() {
 	}
 	let languageTemplates = languageTemplatesRaw as { [key: string]: any }
 
-	let newMap = new Map();
+	let newMap: Map<string, Map<string, LanguagePostfixTemplate>> = new Map();
 	const languageIds = Object.keys(languageTemplatesRaw);
 	for (const languageId of languageIds) {
 		let eachLangTemplate = languageTemplates[languageId] as { templates: LanguagePostfixTemplate[] | undefined; };
 		if (!eachLangTemplate.templates) {
 			continue;
 		}
+		let eachLangMap: Map<string, LanguagePostfixTemplate> = new Map();
 		for (const template of eachLangTemplate.templates) {
-			const key = getKey(languageId, template.triggerWord);
-			if (newMap.has(key)) {
+			if (eachLangMap.has(template.triggerWord)) {
 				showErrorMessage(`Duplicate template: ${template.triggerWord}`);
 				continue;
 			}
@@ -116,8 +114,10 @@ function parseLanguagePostfixTemplates() {
 			} else {
 				template.targetRegExp = DEFAULT_WORD_REGEX;
 			}
-			newMap.set(key, template);
+			template.targetRegExp = new RegExp(template.targetRegExp.source.endsWith('$') ? template.targetRegExp.source : template.targetRegExp.source + '$');
+			eachLangMap.set(template.triggerWord, template);
 		}
+		newMap.set(languageId, eachLangMap);
 	}
 	languagePostfixTemplatesMap = newMap;
 	debugLog("languagePostfixTemplatesMap", JSON.stringify(Array.from(languagePostfixTemplatesMap.entries())));
@@ -132,8 +132,8 @@ function validateAndParseTemplate(template: LanguagePostfixTemplate): string | u
 	const parsedBody: (string | TemplateVarible)[] = [];
 	const body = template.body.join('\n');
 	const bodyParts = splitBody(body);
-	for(const part of bodyParts) {
-		if(!(part.startsWith('${') && part.endsWith('}'))) {
+	for (const part of bodyParts) {
+		if (!(part.startsWith('${') && part.endsWith('}'))) {
 			parsedBody.push(part);
 			continue;
 		}
@@ -209,55 +209,133 @@ function splitBody(body: string): string[] {
 	}
 	return results;
 }
+let postfixCompletionProviderDisposable: vscode.Disposable;
+function registerPostfixCompletionProvider() {
+	let index = -1;
+	if (postfixCompletionProviderDisposable) {
+		postfixCompletionProviderDisposable.dispose();
+		index = extensionContext.subscriptions.indexOf(postfixCompletionProviderDisposable);
+	}
 
-function applyTemplate() {
+	const selector = Array.from(languagePostfixTemplatesMap.keys()).map(languageId => {
+		return {
+			language: languageId
+		}
+	});
+	postfixCompletionProviderDisposable = vscode.languages.registerCompletionItemProvider(selector, new PostfixCompletionItemProvider(), '.');
+	if (index > -1) {
+		extensionContext.subscriptions.splice(index, 1, postfixCompletionProviderDisposable);
+	} else {
+		extensionContext.subscriptions.push(postfixCompletionProviderDisposable);
+	}
+}
+
+class PostfixCompletionItemProvider implements vscode.CompletionItemProvider<vscode.CompletionItem> {
+	provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.CompletionContext): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
+
+		// 补全建议要求：光标前是 `.` 或者光标前的触发词前面是 `.`。其他情况不提供建议。
+		const lineText = document.lineAt(position.line).text;
+		let endsWithDot = lineText.substring(0, position.character).endsWith('.');
+		if (!endsWithDot) {
+			const triggerWordRange = document.getWordRangeAtPosition(position, DEFAULT_WORD_REGEX);
+			if (triggerWordRange && triggerWordRange.start.character > 0) {
+				if (lineText[triggerWordRange.start.character - 1] !== '.') {
+					return [];
+				}
+			}
+		}
+
+		const eachLangMap = languagePostfixTemplatesMap.get(document.languageId);
+		if (!eachLangMap) {
+			return;
+		}
+		let triggerWords = Array.from(eachLangMap.keys());
+		let results = triggerWords.map(triggerWord => {
+			const item = new vscode.CompletionItem({
+				label: triggerWord,
+				detail: "$",
+				description: eachLangMap?.get(triggerWord)?.description,
+			});
+			item.insertText = triggerWord;
+			item.sortText = EXTENSION_NAME;
+			item.preselect = true;
+			item.command = {
+				title: 'Custom Postfix Completion: apply template',
+				command: COMMAND_APPLY_TEMPLATE,
+				arguments: [triggerWord]
+			};
+			return item;
+		})
+		return results;
+	}
+}
+
+function applyTemplate(...args: any[]) {
 	const editor = vscode.window.activeTextEditor;
 	if (!editor) {
 		return;
 	}
 
-	// 获取触发词范围
-	const cursorPosition = editor.selection.end;
-	const triggerWordRange = editor.document.getWordRangeAtPosition(cursorPosition, DEFAULT_WORD_REGEX);
+	// 触发词必须，要么从命令参数传入（补全建议被接受时），要么从编辑器光标前解析出来
+	let triggerWord = args && args.length > 0 ? args[0] as string : undefined;
+	let triggerWordRange = editor.document.getWordRangeAtPosition(editor.selection.end, DEFAULT_WORD_REGEX);
 	debugLog("triggerWordRange", triggerWordRange);
-	if (!triggerWordRange) {
+	if (triggerWord) {
+		if (triggerWordRange) {
+			// do nothing
+		} else {
+			// 在用户输入 . 后提供建议被接受时，triggerWordRange 可能是 undfined。
+			triggerWordRange = new vscode.Range(editor.selection.end, editor.selection.end);
+		}
+	} else {
+		if (triggerWordRange) {
+			triggerWord = editor.document.getText(triggerWordRange);
+		} else {
+			return;
+		}
+	}
+
+	// 触发词前面必须是 . 字符
+	let dotPosition = triggerWordRange.start.character > 0 ? triggerWordRange.start.translate(0, -1) : undefined;
+	debugLog("dotPosition", dotPosition);
+	if (!dotPosition) {
 		return;
 	}
-	// 检查触发词前面是否 . 字符
-	let dotPosition = triggerWordRange.start.translate(0, -1);
-	debugLog("dotPosition", dotPosition);
 	let dotStr = editor.document.getText(new vscode.Range(dotPosition, dotPosition.translate(0, 1)));
 	if (!dotStr || dotStr !== '.') {
 		return
 	}
 
 	// 检查模板配置是否包含此触发词
-	const triggerWord = editor.document.getText(triggerWordRange);
-	const key = getKey(editor.document.languageId, triggerWord);
-	let template = languagePostfixTemplatesMap.get(key)
+	let eachLangMap = languagePostfixTemplatesMap.get(editor.document.languageId)
+	if (!eachLangMap) {
+		return;
+	}
+	let template = eachLangMap.get(triggerWord);
 	if (!template) {
 		return;
 	}
 
-	// 获取模板应用于的表达式（也就是.前面的那部分）
-	const targetRange = editor.document.getWordRangeAtPosition(dotPosition/* .translate(0, -1) */, template.targetRegExp);
-	debugLog("targetRange", targetRange);
-	if (!targetRange) {
+	// 获取模板应用于的target（也就是 . 前面的那部分）
+	const textBeforeDot = editor.document.lineAt(dotPosition.line).text.substring(0, dotPosition.character);
+	debugLog("textBeforeDot", textBeforeDot);
+	let match = template.targetRegExp.exec(textBeforeDot);
+	if (!match || !textBeforeDot.endsWith(match[0])) {
 		return;
 	}
-	let targetWord = editor.document.getText(targetRange);
-	debugLog("triggerWord", triggerWord, "targetWord", targetWord);
-	if (!triggerWord || !targetWord) {
+	let target = match[0];
+	debugLog("triggerWord", triggerWord, "target", target);
+	if (!triggerWord) {
 		return;
 	}
-	if (targetWord.endsWith('.' + triggerWord)) {
-		targetWord = targetWord.substring(0, targetWord.length - triggerWord.length - 1)
-	}
-	debugLog("triggerWord", triggerWord, "targetWord", targetWord);
+	// if (target.endsWith('.' + triggerWord)) {
+	// 	target = target.substring(0, target.length - triggerWord.length - 1)
+	// }
+	// debugLog("triggerWord", triggerWord, "targetWord", target);
 
-	const snippet = templateToSnippet(template, targetWord);
+	const snippet = templateToSnippet(template, target);
 	if (snippet) {
-		let replaceRange = new vscode.Range(targetRange.start, triggerWordRange.end);
+		let replaceRange = new vscode.Range(dotPosition.translate(0, -target.length), triggerWordRange ? triggerWordRange.end : editor.selection.end);
 		editor.insertSnippet(snippet, replaceRange);
 	}
 }

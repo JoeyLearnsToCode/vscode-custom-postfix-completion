@@ -16,10 +16,6 @@
   "contributes": {
     "commands": [
       {
-        "command": "custom-postfix-completion.refresh-configs",
-        "title": "Custom Postfix Completion: refresh configs"
-      },
-      {
         "command": "custom-postfix-completion.apply-template",
         "title": "Custom Postfix Completion: apply template"
       }
@@ -49,7 +45,7 @@
                         "triggerWord": "print",
                         "description": "Just print",
                         "body": [
-                          "print($target$)$END$"
+                          "print(${target})"
                         ]
                       }
                     ]
