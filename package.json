@@ -1,8 +1,9 @@
 {
   "name": "custom-postfix-completion",
   "displayName": "Custom Postfix Completion",
-  "description": "A plugin to enable postfix completion for any language",
-  "version": "0.0.1",
+  "description": "A extension to enable postfix completion for any language",
+  "version": "1.0.1",
+  "repository": "https://github.com/JoeyLearnsToCode/vscode-custom-postfix-completion",
   "engines": {
     "vscode": "^1.85.x"
   },
