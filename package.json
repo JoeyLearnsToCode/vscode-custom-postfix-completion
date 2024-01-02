@@ -3,10 +3,15 @@
   "displayName": "Custom Postfix Completion",
   "description": "A extension to enable postfix completion for any language",
   "version": "1.0.1",
-  "repository": "https://github.com/JoeyLearnsToCode/vscode-custom-postfix-completion",
+  "publisher": "JoeyWang",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JoeyLearnsToCode/vscode-custom-postfix-completion"
+  },
   "engines": {
     "vscode": "^1.85.x"
   },
+  "icon": "images/ICON_128.png",
   "categories": [
     "Other"
   ],
@@ -76,7 +81,7 @@
                           "targetRegExp": {
                             "type": "string",
                             "default": "\\w+",
-                            "description": "Regular expression to match expressions for the template, default: \\w+"
+                            "description": "Regular expression to match target for the template (what this template will apply on), default: \\w+"
                           }
                         },
                         "required": [
@@ -91,7 +96,7 @@
                 }
               }
             },
-            "debugMode":{
+            "debugMode": {
               "type": "boolean",
               "default": false,
               "description": "Enable debug mode for more console logs"
