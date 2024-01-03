@@ -1,5 +1,9 @@
 # Custom Postfix Completion
 
+[中文版](#中文)
+
+> This English document was translated from Chinese by ChatGPT. If there are any issues, please feel free to provide feedback to me.
+
 ## Overview
 
 This extension provides custom postfix completion for Visual Studio Code, allowing users to tailor their own postfix completions for **any language**.
@@ -33,6 +37,111 @@ This extension also provides input suggestions, and when a suggestion is accepte
 
 This extension defines the following Visual Studio Code commands:
 - `custom-postfix-completion.apply-template`: Parses and applies the postfix completion before the cursor.
+
+## Installation
+
+The name of this extension is Custom Postfix Completion. You can search for and install it in Visual Studio Code, or go to the [Extension Marketplace](https://marketplace.visualstudio.com/items?itemName=JoeyWang.custom-postfix-completion) to download (Download Extension) and manually install it.
+
+If you still encounter any issues, please refer to this [tutorial](https://code.visualstudio.com/learn/get-started/extensions).
+
+## Custom Settings
+
+This extension does not provide any predefined postfix completions for any language, which means that users need to customize them on their own. In the Visual Studio Code settings (`settings.json`), use the following configuration to customize postfix completions:
+
+```json
+"custom-postfix-completion": {
+    "languageTemplates": {
+        "go": {
+            "templates": [
+                {
+                    "triggerWord": "print",
+                    "description": "Print it",
+                    "targetRegExp": "[^\\t]+",
+                    "body": [
+                        "fmt.Print(\"${foobar:escapeString(target)}\", ${target})",
+                        ""
+                    ]
+                }
+            ]
+        }
+    }
+}
+```
+The detailed explanation for each part is as follows:
+- `go`: The [LanguageId](https://code.visualstudio.com/docs/languages/identifiers) of the language you want to customize the postfix completion for.
+- `templates`: In the configuration of this extension, a postfix completion is called a template, and `templates` is an array where users can customize multiple templates.
+- Postfix completion template: Elements of the `templates`, which contain fields such as:
+    - `triggerWord`: The trigger word for postfix completion. As the name suggests, the trigger word must be a "word" and can only contain English letters and numbers. The `triggerWord` in `target.triggerWord` is the trigger word, such as the `print` in the [example](#example).
+    - `description`: The description of the postfix completion. It is displayed next to the options when suggestions are shown, like the `Print it` in the [example](#example).
+    - `targetRegExp`: The target regular expression for postfix completion. It determines what `target` is in `target.triggerWord`. The default is `\w+`, which only matches a continuous sequence of English letters or numbers before `.triggerWord`.
+
+        In some cases, this default value may not meet the needs. For example, for the `print` postfix that is used to print the entire line (`5 + 20.print`), the user may want `target` to be everything before `.print` (`5 + 20`) rather than just a sequence of letters or numbers (`20`). In this case, `targetRegExp` can be configured to a more appropriate regular expression. In this example, `[^\\t]+` is suitable (it matches everything except TAB characters at the beginning of the line).
+
+        `targetRegExp` will never match `.triggerWord`; it only matches the content before `.triggerWord`.
+    - `body`: The content of the postfix completion, that is, what `target.triggerWord` becomes after applying the postfix completion. It is an array type, with each element starting a new line after the postfix completion is applied. You can define "variables" within it, see the [next section](#variables) for details.
+
+### Variables
+
+In the `body` of a *postfix completion template*, you can define "variables" in the `${...}` format: they will be assigned a specific value when the postfix completion is applied, or allow the user to press the Tab key to jump between variables in sequence for input after applying the postfix completion (known as "**user interaction**", similar to the [Tabstops](https://code.visualstudio.com/docs/editor/userdefinedsnippets#_tabstops) feature of code snippets, but with a different definition format).
+
+The complete format of variables is: `${NAME#NO:EXPRESSION(target):DEFAULT_VALUE}`.
+- `NAME`: The name of the variable. When `NAME` is `target`, it indicates that the value of the variable is the text of `target` in `target.triggerWord`. Multiple variables with the same `NAME` do not have special functionality.
+- `NO`: The sequence number of the variable. The numbers determine the order of *user interaction*, from smallest to largest.
+
+    Variables without `#NO` do not require *user interaction*, meaning the user pressing the Tab key will not jump to these variables.
+
+    Variables with the same `NO` are treated as the same variable, and after applying the postfix completion, the user can edit them simultaneously.
+
+    The number 0 indicates the end point of *user interaction*. A *postfix completion template* may contain at most one variable with the sequence number 0. If there is no variable with the number 0, *user interaction* will end at the end of the `body` of the *postfix completion template*.
+- `EXPRESSION(target)`: An expression used to calculate the default value of the variable. Due to limitations of the Visual Studio Code API, the parameter of `EXPRESSION(target)` can only be `target`, not the `NAME` of other variables (☹️). Currently, the supported `EXPRESSION` is:
+    - `escapeString`: Escapes double quotes `"` in the parameter to `\"` to safely include it in a string.
+- `DEFAULT_VALUE`: The default value of the variable. When both `EXPRESSION(target)` and `DEFAULT_VALUE` exist, `EXPRESSION(target)` takes precedence.
+
+Optional rules for each part:
+- `NAME` is required.
+- When `#NO` is absent, since the variable will be skipped in *user interaction*, it must be able to be assigned a default text by this extension, so it must meet one of the following conditions:
+    - `NAME` is `target`, with the default value being the text of `target` in `target.triggerWord`.
+    - Includes `EXPRESSION(target)`.
+    - Includes `DEFAULT_VALUE`.
+- If `DEFAULT_VALUE` is absent, the preceding colon `:` should not exist.
+- If both `EXPRESSION(target)` and `DEFAULT_VALUE` are absent, both colons `:` should not exist.
+- If `EXPRESSION(target)` is absent but `DEFAULT_VALUE` exists, there should be two colons `:` preceding the `DEFAULT_VALUE`.
+
+### Explanation of the Configuration Above
+
+Now that all the rules have been introduced, let's see what the configuration at the beginning of the [Custom Settings](#custom-settings) means:
+```json
+{
+    "triggerWord": "print",
+    "description": "Print it",
+    "targetRegExp": "[^\\t]+",
+    "body": [
+        "fmt.Print(\"${foobar:escapeString(target)}\", ${target})",
+        ""
+    ]
+}
+```
+- `"triggerWord": "print"`: The trigger word for this template is `print`.
+- `"targetRegExp": "[^\\t]+"`: The target for this template is all the continuous non-tab characters in front of `.print`, usually the entire line of content.
+- `body: ...`: The `body` of this template contains two variables in the first line and ends on the second line. The two variables are described as follows:
+    - `${foobar:escapeString(target)}`: This variable skips *user interaction*, and its default value is the result of `escapeString` escaping on target.
+    - `${target}`: This variable skips *user interaction*, and its default value is the text of the target.
+
+Together, they enable the postfix completion effect demonstrated in the [Example](#example).
+
+## Release Notes
+
+### 1.0.1
+
+Initial release, implemented postfix completion and code suggestions.
+
+### 1.0.2
+
+Improved README, icon.
+
+## Acknowledgments
+
+This extension is greatly inspired by [Custom Postfix Templates](https://github.com/xylo/intellij-postfix-templates#custom-postfix-templates-for-intellij-idea), a plugin that enhances postfix completion functionality for JetBrains IDEs.
 
 # 中文
 
@@ -141,7 +250,7 @@ This extension defines the following Visual Studio Code commands:
 ### 解释上方的配置
 
 现在，所有规则都介绍完了，我们来看一下[自定义设置](#自定义设置)开头的配置是什么意思：
-```
+```json
 {
     "triggerWord": "print",
     "description": "Print it",
