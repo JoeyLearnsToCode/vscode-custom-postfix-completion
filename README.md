@@ -1,5 +1,39 @@
 # Custom Postfix Completion
 
+## Overview
+
+This extension provides custom postfix completion for Visual Studio Code, allowing users to tailor their own postfix completions for **any language**.
+
+[Postfix completion](https://www.jetbrains.com/help/idea/settings-postfix-completion.html) is a coding aid that enables developers to quickly complete code snippets by typing short postfix words. This feature is common in JetBrains IDEs, but currently not available in Visual Studio Code. Although there are other extensions that offer postfix completion for specific languages, none provide a universal, customizable postfix completion for all languages, which is why I developed this extension.
+
+## Example
+
+I primarily use Go for development, and here is an example in Go (to reiterate: you can use this extension with any language):
+
+Before postfix completion:
+
+![](./images/README_IMG_BEFORE_APPLY.png)
+
+After postfix completion:
+
+![](./images/README_IMG_AFTER_APPLY.png)
+
+You can see that the `.print` postfix has been applied to the target (`m["foo"]`).
+
+This extension also provides input suggestions, and when a suggestion is accepted, the effect is as shown above:
+
+![](./images/README_IMG_SUGGESTION.png)
+
+## Features
+
+- For text in the format `target.triggerWord`, if the user has [customized](#custom-settings) a postfix completion with `triggerWord` as the trigger, then after the `custom-postfix-completion.apply-template` command is executed, the user's custom postfix completion will be applied to `target`. Users can bind this command to a keyboard shortcut (e.g., `Ctrl+Alt+.`) for quick application of postfix completion.
+- For languages where the user has defined postfix completions, suggestions are provided during input, and when a suggestion is accepted, the postfix completion is also applied.
+
+## Commands
+
+This extension defines the following Visual Studio Code commands:
+- `custom-postfix-completion.apply-template`: Parses and applies the postfix completion before the cursor.
+
 # 中文
 
 ## 概述
