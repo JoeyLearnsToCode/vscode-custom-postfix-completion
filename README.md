@@ -139,6 +139,10 @@ Initial release, implemented postfix completion and code suggestions.
 
 Improved README, icon.
 
+### 1.0.3
+
+Improved README.
+
 ## Acknowledgments
 
 This extension is greatly inspired by [Custom Postfix Templates](https://github.com/xylo/intellij-postfix-templates#custom-postfix-templates-for-intellij-idea), a plugin that enhances postfix completion functionality for JetBrains IDEs.
@@ -278,6 +282,10 @@ This extension is greatly inspired by [Custom Postfix Templates](https://github.
 ### 1.0.2
 
 完善 README、图标
+
+### 1.0.3
+
+完善 README
 
 ## 鸣谢
 
