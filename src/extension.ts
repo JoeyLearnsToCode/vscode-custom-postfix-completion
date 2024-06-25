@@ -370,6 +370,9 @@ function getExpressionFunc(expressionName: string): undefined | ((target: string
 		case "escapeString": {
 			return expressionEscapeString;
 		}
+		case "upperFistLetter": {
+			return upperFistLetter;
+		}
 		default: {
 			return undefined;
 		}
@@ -383,4 +386,7 @@ function evalExpression(expressionAndParam: (((word: string) => string) | string
 }
 function expressionEscapeString(targetWord: string): string {
 	return targetWord.replaceAll('"', '\\"');
+}
+function upperFistLetter(targetWord: string): string {
+    return targetWord.charAt(0).toUpperCase() + targetWord.slice(1);
 }
