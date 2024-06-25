@@ -95,6 +95,7 @@ The complete format of variables is: `${NAME#NO:EXPRESSION(target):DEFAULT_VALUE
     The number 0 indicates the end point of *user interaction*. A *postfix completion template* may contain at most one variable with the sequence number 0. If there is no variable with the number 0, *user interaction* will end at the end of the `body` of the *postfix completion template*.
 - `EXPRESSION(target)`: An expression used to calculate the default value of the variable. Due to limitations of the Visual Studio Code API, the parameter of `EXPRESSION(target)` can only be `target`, not the `NAME` of other variables (☹️). Currently, the supported `EXPRESSION` is:
     - `escapeString`: Escapes double quotes `"` in the parameter to `\"` to safely include it in a string.
+    - `upperFirstLetter`: Converts the first letter of the parameter to uppercase.
 - `DEFAULT_VALUE`: The default value of the variable. When both `EXPRESSION(target)` and `DEFAULT_VALUE` exist, `EXPRESSION(target)` takes precedence.
 
 Optional rules for each part:
@@ -142,6 +143,10 @@ Improved README, icon.
 ### 1.0.3
 
 Improved README.
+
+### 1.0.4
+
+Added `EXPRESSION`: `upperFirstLetter`, which converts the first letter of the parameter to uppercase.
 
 ## Acknowledgments
 
@@ -239,6 +244,7 @@ This extension is greatly inspired by [Custom Postfix Templates](https://github.
     序号 0 表示*用户交互*的终点，一个*后缀补全模板*最多包含一个序号 0 的变量，如果不包含序号 0 的变量，*用户交互*会在*后缀补全模板*的`body`末尾结束。
 - EXPRESSION(target)：用于计算该变量默认值的表达式。由于 Visual Studio Code API 限制，`EXPRESSION(target)`的参数只能是`target`，不能是其他变量的`NAME`（☹️）。目前支持的`EXPRESSION`有：
     - `escapeString`：将参数中的双引号`"`转义为`\"`，以便能将其安全地放进字符串中。
+    - `upperFirstLetter`：将参数的第一个字母转换为大写。
 - DEFAUL_VALUE：变量默认值。`EXPRESSION(target)`和`DEFAUL_VALUE`都存在时，以`EXPRESSION(target)`优先。
 
 各部分可选规则：
@@ -286,6 +292,10 @@ This extension is greatly inspired by [Custom Postfix Templates](https://github.
 ### 1.0.3
 
 完善 README
+
+### 1.0.4
+
+添加`EXPRESSION`：`upperFirstLetter`，它将参数的第一个字母转换为大写。
 
 ## 鸣谢
 
