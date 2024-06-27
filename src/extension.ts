@@ -1,13 +1,14 @@
 import * as vscode from 'vscode';
 
-const EXTENSION_NAME = "Custom Postfix Completion"
+const EXTENSION_NAME = "Custom Postfix Completion";
 const COMMAND_APPLY_TEMPLATE = 'custom-postfix-completion.apply-template';
-const DEFAULT_WORD_REGEX = /\w+/
+const DEFAULT_WORD_REGEX = /\w+/;
 const VARIABLE_REGEX = /^\$\{(\w+)(?:#(\d+))?(?::(\w+\(target\))?(?::(.+))?)?\}$/;
 let extensionContext: vscode.ExtensionContext;
 let isDebugMode = false;
 let configuration: vscode.WorkspaceConfiguration;
 let languagePostfixTemplatesMap: Map<string, Map<string, LanguagePostfixTemplate>>;
+
 type LanguagePostfixTemplate = {
 	triggerWord: string;
 	description: string;
@@ -15,16 +16,18 @@ type LanguagePostfixTemplate = {
 	body: string[];
 
 	parsedBody: (string | TemplateVarible)[];
-}
+};
+
 type TemplateVarible = {
 	name: string;
 	no?: number;
 	// 表达式和参数，如果不是 undefined，首个元素是表达式（函数）
 	expressionAndParam?: (((word: string) => string) | string)[];
 	defaultValue?: string;
-}
+};
 
 export function deactivate() { }
+
 export function activate(context: vscode.ExtensionContext) {
 	extensionContext = context;
 	// 初始化配置
@@ -56,13 +59,15 @@ function tryCommand(callback: (...args: any[]) => any): (...args: any[]) => any 
 			console.log(error);
 			showErrorMessage('Fail to execute command, you can check console (in developer tools) to see more details');
 		}
-	}
+	};
 }
+
 function debugLog(message?: any, ...optionalParams: any[]): void {
 	if (isDebugMode) {
 		console.log(message, ...optionalParams);
 	}
 }
+
 function showErrorMessage<T extends string>(message: string, ...items: T[]): Thenable<T | undefined> {
 	return vscode.window.showErrorMessage(`${EXTENSION_NAME}: ` + message, ...items);
 }
@@ -82,15 +87,26 @@ function refreshConfigs() {
 	parseLanguagePostfixTemplates();
 	registerPostfixCompletionProvider();
 }
+
 function parseLanguagePostfixTemplates() {
-	let languageTemplatesRaw = configuration.get('languageTemplates')
+	let languageTemplatesRaw: Record<string, any> | undefined = configuration.get('languageTemplates');
 	if (!languageTemplatesRaw) {
 		return;
 	}
-	let languageTemplates = languageTemplatesRaw as { [key: string]: any }
+	let languageTemplates: Record<string, any> = {};
+	
+	// 支持多语言使用同一份模板 , 分割
+	for (const templateKey in languageTemplatesRaw) {
+		if (Object.prototype.hasOwnProperty.call(languageTemplatesRaw, templateKey)) {
+			const value = languageTemplatesRaw[templateKey];
+			for (const languageId of templateKey.split(',')) {
+				languageTemplates[languageId] = value;
+			}
+		}
+	}
 
 	let newMap: Map<string, Map<string, LanguagePostfixTemplate>> = new Map();
-	const languageIds = Object.keys(languageTemplatesRaw);
+	const languageIds = Object.keys(languageTemplates);
 	for (const languageId of languageIds) {
 		let eachLangTemplate = languageTemplates[languageId] as { templates: LanguagePostfixTemplate[] | undefined; };
 		if (!eachLangTemplate.templates) {
@@ -122,6 +138,7 @@ function parseLanguagePostfixTemplates() {
 	languagePostfixTemplatesMap = newMap;
 	debugLog("languagePostfixTemplatesMap", JSON.stringify(Array.from(languagePostfixTemplatesMap.entries())));
 }
+
 /**
  * Validates and parses a template.
  *
@@ -177,6 +194,7 @@ function validateAndParseTemplate(template: LanguagePostfixTemplate): string | u
 	template.parsedBody = parsedBody;
 	return undefined;
 }
+
 // 把 body 拆分为变量和非变量，按顺序添加到 results。
 // 不用正则的原因是正则不太好处理 `${`、`}` 嵌套的情况。
 function splitBody(body: string): string[] {
@@ -209,7 +227,9 @@ function splitBody(body: string): string[] {
 	}
 	return results;
 }
+
 let postfixCompletionProviderDisposable: vscode.Disposable;
+
 function registerPostfixCompletionProvider() {
 	let index = -1;
 	if (postfixCompletionProviderDisposable) {
@@ -220,7 +240,7 @@ function registerPostfixCompletionProvider() {
 	const selector = Array.from(languagePostfixTemplatesMap.keys()).map(languageId => {
 		return {
 			language: languageId
-		}
+		};
 	});
 	postfixCompletionProviderDisposable = vscode.languages.registerCompletionItemProvider(selector, new PostfixCompletionItemProvider(), '.');
 	if (index > -1) {
@@ -233,15 +253,20 @@ function registerPostfixCompletionProvider() {
 class PostfixCompletionItemProvider implements vscode.CompletionItemProvider<vscode.CompletionItem> {
 	provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.CompletionContext): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
 
-		// 补全建议要求：光标前是 `.` 或者光标前的触发词前面是 `.`。其他情况不提供建议。
+		// 补全建议要求：光标前是任意有效输入 + `.` 或者光标前的触发词前面是 `.`。其他情况不提供建议。
 		const lineText = document.lineAt(position.line).text;
-		let endsWithDot = lineText.substring(0, position.character).endsWith('.');
+		const positionText = lineText.substring(0, position.character);
+		let endsWithDot = positionText.endsWith('.') && positionText.trim().length > 1;
 		if (!endsWithDot) {
 			const triggerWordRange = document.getWordRangeAtPosition(position, DEFAULT_WORD_REGEX);
 			if (triggerWordRange && triggerWordRange.start.character > 0) {
-				if (lineText[triggerWordRange.start.character - 1] !== '.') {
+				const triggerWordIndex = triggerWordRange.start.character - 1;
+				if (lineText[triggerWordIndex] !== '.' || lineText.slice(0, triggerWordIndex).trim().length === 0) {
 					return [];
 				}
+			} else {
+				// 行首 triggerWordRange.start.character = 0 不提供建议
+				return [];
 			}
 		}
 
@@ -265,7 +290,7 @@ class PostfixCompletionItemProvider implements vscode.CompletionItemProvider<vsc
 				arguments: [triggerWord]
 			};
 			return item;
-		})
+		});
 		return results;
 	}
 }
@@ -303,11 +328,11 @@ function applyTemplate(...args: any[]) {
 	}
 	let dotStr = editor.document.getText(new vscode.Range(dotPosition, dotPosition.translate(0, 1)));
 	if (!dotStr || dotStr !== '.') {
-		return
+		return;
 	}
 
 	// 检查模板配置是否包含此触发词
-	let eachLangMap = languagePostfixTemplatesMap.get(editor.document.languageId)
+	let eachLangMap = languagePostfixTemplatesMap.get(editor.document.languageId);
 	if (!eachLangMap) {
 		return;
 	}
@@ -339,6 +364,7 @@ function applyTemplate(...args: any[]) {
 		editor.insertSnippet(snippet, replaceRange);
 	}
 }
+
 function templateToSnippet(template: LanguagePostfixTemplate, targetWord: string): vscode.SnippetString | undefined {
 	const snippet = new vscode.SnippetString();
 	for (const part of template.parsedBody) {
@@ -361,10 +387,12 @@ function templateToSnippet(template: LanguagePostfixTemplate, targetWord: string
 	debugLog("snippet", snippet);
 	return snippet;
 }
+
 function extractExpression(expression: string): string[] | undefined {
 	let match = /^(\w+)\((.*)\)$/.exec(expression);
 	return match ? [match[1], match[2]] : undefined;
 }
+
 function getExpressionFunc(expressionName: string): undefined | ((target: string) => string) {
 	switch (expressionName) {
 		case "escapeString": {
@@ -378,15 +406,18 @@ function getExpressionFunc(expressionName: string): undefined | ((target: string
 		}
 	}
 }
+
 function evalExpression(expressionAndParam: (((word: string) => string) | string)[] | undefined, targetWord: string): string | undefined {
 	if (!expressionAndParam) {
 		return undefined;
 	}
 	return (expressionAndParam[0] as ((target: string) => string))(targetWord);
 }
+
 function expressionEscapeString(targetWord: string): string {
 	return targetWord.replaceAll('"', '\\"');
 }
+
 function expressionUpperFirstLetter(targetWord: string): string {
     return targetWord.charAt(0).toUpperCase() + targetWord.slice(1);
 }
