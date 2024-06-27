@@ -253,15 +253,20 @@ function registerPostfixCompletionProvider() {
 class PostfixCompletionItemProvider implements vscode.CompletionItemProvider<vscode.CompletionItem> {
 	provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.CompletionContext): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
 
-		// 补全建议要求：光标前是 `.` 或者光标前的触发词前面是 `.`。其他情况不提供建议。
+		// 补全建议要求：光标前是任意有效输入 + `.` 或者光标前的触发词前面是 `.`。其他情况不提供建议。
 		const lineText = document.lineAt(position.line).text;
-		let endsWithDot = lineText.substring(0, position.character).endsWith('.');
+		const positionText = lineText.substring(0, position.character);
+		let endsWithDot = positionText.endsWith('.') && positionText.trim().length > 1;
 		if (!endsWithDot) {
 			const triggerWordRange = document.getWordRangeAtPosition(position, DEFAULT_WORD_REGEX);
 			if (triggerWordRange && triggerWordRange.start.character > 0) {
-				if (lineText[triggerWordRange.start.character - 1] !== '.') {
+				const triggerWordIndex = triggerWordRange.start.character - 1;
+				if (lineText[triggerWordIndex] !== '.' || lineText.slice(0, triggerWordIndex).trim().length === 0) {
 					return [];
 				}
+			} else {
+				// 行首 triggerWordRange.start.character = 0 不提供建议
+				return [];
 			}
 		}
 
