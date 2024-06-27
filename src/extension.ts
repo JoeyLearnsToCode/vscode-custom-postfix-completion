@@ -89,14 +89,24 @@ function refreshConfigs() {
 }
 
 function parseLanguagePostfixTemplates() {
-	let languageTemplatesRaw = configuration.get('languageTemplates');
+	let languageTemplatesRaw: Record<string, any> | undefined = configuration.get('languageTemplates');
 	if (!languageTemplatesRaw) {
 		return;
 	}
-	let languageTemplates = languageTemplatesRaw as { [key: string]: any };
+	let languageTemplates: Record<string, any> = {};
+	
+	// 支持多语言使用同一份模板 , 分割
+	for (const templateKey in languageTemplatesRaw) {
+		if (Object.prototype.hasOwnProperty.call(languageTemplatesRaw, templateKey)) {
+			const value = languageTemplatesRaw[templateKey];
+			for (const languageId of templateKey.split(',')) {
+				languageTemplates[languageId] = value;
+			}
+		}
+	}
 
 	let newMap: Map<string, Map<string, LanguagePostfixTemplate>> = new Map();
-	const languageIds = Object.keys(languageTemplatesRaw);
+	const languageIds = Object.keys(languageTemplates);
 	for (const languageId of languageIds) {
 		let eachLangTemplate = languageTemplates[languageId] as { templates: LanguagePostfixTemplate[] | undefined; };
 		if (!eachLangTemplate.templates) {
