@@ -152,6 +152,10 @@ Added `EXPRESSION`: `upperFirstLetter`, which converts the first letter of the p
 
 Support multiple languages to share a template, using `,` segmentation.
 
+### 1.0.6
+
+Optimization suggestion trigger.
+
 ## Acknowledgments
 
 This extension is greatly inspired by [Custom Postfix Templates](https://github.com/xylo/intellij-postfix-templates#custom-postfix-templates-for-intellij-idea), a plugin that enhances postfix completion functionality for JetBrains IDEs.
@@ -304,6 +308,10 @@ This extension is greatly inspired by [Custom Postfix Templates](https://github.
 ### 1.0.5
 
 支持多语言共用一份模板，使用 `,` 分割
+
+### 1.0.6
+
+优化建议触发
 
 ## 鸣谢
 
