@@ -68,7 +68,7 @@ This extension does not provide any predefined postfix completions for any langu
 }
 ```
 The detailed explanation for each part is as follows:
-- `go`: The [LanguageId](https://code.visualstudio.com/docs/languages/identifiers) of the language you want to customize the postfix completion for.
+- `go`: The [LanguageId](https://code.visualstudio.com/docs/languages/identifiers) of the language you want to customize the postfix completion for. Support multiple languages to share a template, using `,` segmentation.
 - `templates`: In the configuration of this extension, a postfix completion is called a template, and `templates` is an array where users can customize multiple templates.
 - Postfix completion template: Elements of the `templates`, which contain fields such as:
     - `triggerWord`: The trigger word for postfix completion. As the name suggests, the trigger word must be a "word" and can only contain English letters and numbers. The `triggerWord` in `target.triggerWord` is the trigger word, such as the `print` in the [example](#example).
@@ -148,6 +148,14 @@ Improved README.
 
 Added `EXPRESSION`: `upperFirstLetter`, which converts the first letter of the parameter to uppercase.
 
+### 1.0.5
+
+Support multiple languages to share a template, using `,` segmentation.
+
+### 1.0.6
+
+Optimization suggestion trigger.
+
 ## Acknowledgments
 
 This extension is greatly inspired by [Custom Postfix Templates](https://github.com/xylo/intellij-postfix-templates#custom-postfix-templates-for-intellij-idea), a plugin that enhances postfix completion functionality for JetBrains IDEs.
@@ -217,7 +225,7 @@ This extension is greatly inspired by [Custom Postfix Templates](https://github.
 }
 ```
 其中每个部分的详细说明如下：
-- go：你想要为其自定义后缀补全的语言的 [LanguageId](https://code.visualstudio.com/docs/languages/identifiers)
+- go：你想要为其自定义后缀补全的语言的 [LanguageId](https://code.visualstudio.com/docs/languages/identifiers)。支持多语言共用一份模板，使用 `,` 分割。
 - templates: 在本拓展配置中，一个后缀补全被称为一个模板（template），`templates`是一个数组，用户可以自定义多个模板。
 - 后缀补全模板：`templates`的元素，包含这样一些字段：
     - triggerWord: 后缀补全的触发词。顾名思义，触发词必须是一个“词”，只能包含英文字母、数字。`target.triggerWord`中的`triggerWord`就是触发词，例如[示例](#示例)中的`print`。
@@ -296,6 +304,14 @@ This extension is greatly inspired by [Custom Postfix Templates](https://github.
 ### 1.0.4
 
 添加`EXPRESSION`：`upperFirstLetter`，它将参数的第一个字母转换为大写。
+
+### 1.0.5
+
+支持多语言共用一份模板，使用 `,` 分割
+
+### 1.0.6
+
+优化建议触发
 
 ## 鸣谢
 
