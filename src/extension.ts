@@ -4,27 +4,49 @@ const EXTENSION_NAME = "Custom Postfix Completion";
 const COMMAND_APPLY_TEMPLATE = 'custom-postfix-completion.apply-template';
 const DEFAULT_WORD_REGEX = /\w+/;
 const VARIABLE_REGEX = /^\$\{(\w+)(?:#(\d+))?(?::(\w+\(target\))?(?::(.+))?)?\}$/;
+// 用于匹配 VS Code 标准占位符 (例如 ${0:pass}) 的正则
+const STANDARD_PLACEHOLDER_REGEX = /^\$\{(\d+)(?::(.*?))?\}$/;
 let extensionContext: vscode.ExtensionContext;
 let isDebugMode = false;
 let configuration: vscode.WorkspaceConfiguration;
 let languagePostfixTemplatesMap: Map<string, Map<string, LanguagePostfixTemplate>>;
 
+// 自定义变量的类型
+type CustomTemplateVariable = {
+	isStandardPlaceholder: false; // 这是辨识符，用于区分类型
+	name: string;
+	no?: number;
+	expressionAndParam?: (((word: string) => string) | string)[];
+	defaultValue?: string;
+};
+
+// VS Code 标准占位符的类型
+type StandardPlaceholder = {
+	isStandardPlaceholder: true; // 这是辨识符
+	tabstop: number;
+	defaultValue: string;
+};
+
+// 解析后的 body 片段可以是：普通字符串、自定义变量、或标准占位符
+type ParsedBodyPart = string | CustomTemplateVariable | StandardPlaceholder;
+
+// 修改 LanguagePostfixTemplate 定义中的 parsedBody 字段
 type LanguagePostfixTemplate = {
 	triggerWord: string;
 	description: string;
 	targetRegExp: RegExp;
 	body: string[];
 
-	parsedBody: (string | TemplateVarible)[];
+	parsedBody: ParsedBodyPart[]; // 修改这一行 ↑
 };
 
-type TemplateVarible = {
-	name: string;
-	no?: number;
-	// 表达式和参数，如果不是 undefined，首个元素是表达式（函数）
-	expressionAndParam?: (((word: string) => string) | string)[];
-	defaultValue?: string;
-};
+// type TemplateVarible = {
+// 	name: string;
+// 	no?: number;
+// 	// 表达式和参数，如果不是 undefined，首个元素是表达式（函数）
+// 	expressionAndParam?: (((word: string) => string) | string)[];
+// 	defaultValue?: string;
+// };
 
 export function deactivate() { }
 
@@ -146,7 +168,7 @@ function parseLanguagePostfixTemplates() {
  * @return {string | undefined} - Validation errors or undefined if the template is valid.
  */
 function validateAndParseTemplate(template: LanguagePostfixTemplate): string | undefined {
-	const parsedBody: (string | TemplateVarible)[] = [];
+	const parsedBody: ParsedBodyPart[] = [];
 	const body = template.body.join('\n');
 	const bodyParts = splitBody(body);
 	for (const part of bodyParts) {
@@ -156,18 +178,32 @@ function validateAndParseTemplate(template: LanguagePostfixTemplate): string | u
 		}
 
 		const possibleVariable = part;
+
+		// 优先检查是否为 VS Code 标准占位符 (例如 ${0:pass})
+		STANDARD_PLACEHOLDER_REGEX.lastIndex = 0; // 重置正则状态
+		const standardMatches = STANDARD_PLACEHOLDER_REGEX.exec(possibleVariable);
+		if (standardMatches) {
+			const [, tabstop, defaultValue] = standardMatches;
+			parsedBody.push({
+				isStandardPlaceholder: true,
+				tabstop: Number(tabstop),
+				defaultValue: defaultValue || '',
+			});
+			continue; // 处理完毕，进入下一次循环
+		}
+
+		// 如果不是标准占位符，再检查是否为插件的自定义变量
+		VARIABLE_REGEX.lastIndex = 0; // 重置正则状态
 		const matches = VARIABLE_REGEX.exec(possibleVariable);
-		VARIABLE_REGEX.lastIndex = 0;
 		if (!matches) {
 			return `Wrong format of variable: ${possibleVariable}`;
 		}
+
 		const [variable, name, no, expression, defaultValue] = matches;
 		debugLog("variable", variable, "name", name, "no", no, "expression", expression, "defaultValue", defaultValue);
 
-		// 不定义 NO 的变量跳过用户交互
 		const skipUserInteraction = no === undefined;
 		const isTarget = /^target$/i.test(name);
-		// 跳过用户交互的变量必须是 target 变量，或者包含 EXPRESSION 或 DEFAULT_VALUE
 		if (skipUserInteraction && !isTarget && !expression && !defaultValue) {
 			return `NAME without #NO must include EXPRESSION or DEFAULT_VALUE: ${variable}`;
 		}
@@ -185,11 +221,12 @@ function validateAndParseTemplate(template: LanguagePostfixTemplate): string | u
 		}
 
 		parsedBody.push({
+			isStandardPlaceholder: false, // 明确标记为自定义变量
 			name,
 			no: no ? Number(no) : undefined,
 			expressionAndParam: expressionAndParam,
 			defaultValue,
-		} as TemplateVarible);
+		});
 	}
 	template.parsedBody = parsedBody;
 	return undefined;
@@ -373,14 +410,20 @@ function templateToSnippet(template: LanguagePostfixTemplate, targetWord: string
 			continue;
 		}
 
-		let variable = part as TemplateVarible;
-		const skipUserInteraction = variable.no === undefined;
-		const isTarget = /^target$/i.test(variable.name);
-		const value = isTarget ? targetWord : evalExpression(variable.expressionAndParam, targetWord) || variable.defaultValue || '';
-		if (skipUserInteraction) {
-			snippet.appendText(value);
+		// 通过辨识符 `isStandardPlaceholder` 来区分两种类型
+		if (part.isStandardPlaceholder) {
+			// 如果是标准占位符
+			snippet.appendPlaceholder(part.defaultValue, part.tabstop);
 		} else {
-			snippet.appendPlaceholder(value, variable.no);
+			// 如果是自定义变量
+			const skipUserInteraction = part.no === undefined;
+			const isTarget = /^target$/i.test(part.name);
+			const value = isTarget ? targetWord : evalExpression(part.expressionAndParam, targetWord) || part.defaultValue || '';
+			if (skipUserInteraction) {
+				snippet.appendText(value);
+			} else {
+				snippet.appendPlaceholder(value, part.no);
+			}
 		}
 	}
 
